@@ -20,11 +20,19 @@ param(
     [string]$compressionTool = "dcmcjpls"
 )
 
+# Enable ANSI support if needed (for older versions, typically not needed in Windows Terminal)
+$Host.UI.RawUI.FlushInputBuffer()  # Optional, clears leftover input
+
 # Get all .dcm files recursively from the root directory
-Get-ChildItem -Path $rootDir -File -Recurse | ForEach-Object {
-    $file = $_.FullName
-    $dir = $_.DirectoryName
-    $filename = $_.Name
+$files = Get-ChildItem -Path $rootDir -File -Recurse
+$total = $files.Count
+$index = 0
+
+foreach ($fileInfo in $files) {
+    $index++
+    $file = $fileInfo.FullName
+    $dir = $fileInfo.DirectoryName
+    $filename = $fileInfo.Name
 
     # Create a unique temporary filename in the same directory
     $tempFile = Join-Path $dir ([System.IO.Path]::GetRandomFileName() + ".dcm")
@@ -44,7 +52,8 @@ Get-ChildItem -Path $rootDir -File -Recurse | ForEach-Object {
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $processInfo
 
-    Write-Host "Processing file using ${compressionTool}: $file"
+    $percent = [math]::Round(($index / $total) * 100)
+    Write-Host "`r[$percent%] Processing: $filename" -NoNewline
 
     # Start the compression process
     $process.Start() | Out-Null
@@ -60,6 +69,7 @@ Get-ChildItem -Path $rootDir -File -Recurse | ForEach-Object {
         Rename-Item -Path $tempFile -NewName $filename
     } else {
         # Compression failed, output error message
+        Write-Host ""
         Write-Host "Compression failed for file: $file" -ForegroundColor Red
         Write-Host "Output: $stdout" -ForegroundColor Yellow
         Write-Host "Error: $stderr" -ForegroundColor Yellow
@@ -70,3 +80,6 @@ Get-ChildItem -Path $rootDir -File -Recurse | ForEach-Object {
         }
     }
 }
+
+# Move to a new line at the end
+Write-Host "`r[100%] Done.`n"
